@@ -1,0 +1,27 @@
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+.DS_Store
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+firmware/build/*
+firmware/build-rp2350/*
+firmware/build-rp2040/*
+firmware/build_release/*
+firmware/eclipse_build/*
+/pico-sdk
+/build
+.vscode
+
+# Ignore all markdown files except key docs
+*.md
+!README.md
+!Documentation/current_architecture.md
+!Documentation/Roadmap.md
+!Documentation/Features/*.md
