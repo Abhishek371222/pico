@@ -142,7 +142,8 @@ void pdm_setup_hw(uint8_t pin) {
     pio_sm_init(PDM_PIO, PDM_SM, pdm_pio_offset, &c);
 
     pdm_update_clock(96000);
-    pio_sm_set_enabled(PDM_PIO, PDM_SM, true);
+    // Do NOT start PIO SM here — pdm_processing_loop starts it when pdm_enabled goes true.
+    // Starting unconditionally would drive the PDM pin with a 12 MHz carrier while the sub is off.
 
     pdm_dma_chan = dma_claim_unused_channel(true);
     dma_channel_config dmac = dma_channel_get_default_config(pdm_dma_chan);
@@ -151,7 +152,8 @@ void pdm_setup_hw(uint8_t pin) {
     channel_config_set_write_increment(&dmac, false);
     channel_config_set_dreq(&dmac, pio_get_dreq(PDM_PIO, PDM_SM, true));
     channel_config_set_ring(&dmac, false, PDM_DMA_RING_BITS);
-    dma_channel_configure(pdm_dma_chan, &dmac, &PDM_PIO->txf[PDM_SM], pdm_dma_buffer, 0xFFFFFFFF, true);
+    // Configure but do NOT trigger — pdm_processing_loop triggers when enabled.
+    dma_channel_configure(pdm_dma_chan, &dmac, &PDM_PIO->txf[PDM_SM], pdm_dma_buffer, 0xFFFFFFFF, false);
 }
 
 void pdm_change_pin(uint8_t new_pin) {

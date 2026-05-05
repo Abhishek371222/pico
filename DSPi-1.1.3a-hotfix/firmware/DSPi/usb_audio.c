@@ -1809,24 +1809,12 @@ static void vendor_cmd_packet(struct usb_endpoint *ep) {
             if (out < NUM_OUTPUT_CHANNELS && buffer->data_len >= 1) {
                 bool want_enable = (vendor_rx_buf[0] != 0);
 
-                // Mutual exclusion interlock: PDM vs EQ worker outputs
-                // Core 1 can only do one: PDM or EQ worker (outputs 2+ on both platforms)
-                if (want_enable) {
-                    bool is_pdm = (out == NUM_OUTPUT_CHANNELS - 1);
-                    bool is_core1_eq = (out >= CORE1_EQ_FIRST_OUTPUT && out <= CORE1_EQ_LAST_OUTPUT);
-
-                    if (is_pdm) {
-                        for (int i = CORE1_EQ_FIRST_OUTPUT; i <= CORE1_EQ_LAST_OUTPUT; i++) {
-                            if (matrix_mixer.outputs[i].enabled) goto skip_enable;
-                        }
-                    } else if (is_core1_eq) {
-                        if (matrix_mixer.outputs[NUM_OUTPUT_CHANNELS - 1].enabled) goto skip_enable;
-                    }
-                }
-
                 matrix_mixer.outputs[out].enabled = want_enable ? 1 : 0;
 
-                // Determine new Core 1 mode and transition
+                // Determine new Core 1 mode and transition.
+                // PDM takes priority: when sub is enabled Core 1 runs PDM and Core 0
+                // handles EQ for all outputs (0-3) in the single-core path.  This allows
+                // SPDIF 2 and PDM sub to be active simultaneously without conflict.
                 Core1Mode new_mode = derive_core1_mode();
                 if (new_mode != core1_mode) {
                     core1_mode = new_mode;
@@ -1836,7 +1824,6 @@ static void vendor_cmd_packet(struct usb_endpoint *ep) {
                     __sev();  // Wake Core 1 to pick up mode change
                 }
             }
-            skip_enable:
             break;
         }
 
@@ -2506,22 +2493,10 @@ static bool vendor_setup_request_handler(__unused struct usb_interface *interfac
             }
 
             case REQ_GET_CORE1_CONFLICT: {
-                // wValue = proposed output index to enable
-                // Returns 1 if enabling it would conflict, 0 if OK
-                uint8_t out = (uint8_t)setup->wValue;
-                uint8_t conflict = 0;
-                if (out < NUM_OUTPUT_CHANNELS) {
-                    bool is_pdm = (out == NUM_OUTPUT_CHANNELS - 1);
-                    bool is_core1_eq = (out >= CORE1_EQ_FIRST_OUTPUT && out <= CORE1_EQ_LAST_OUTPUT);
-                    if (is_pdm) {
-                        for (int i = CORE1_EQ_FIRST_OUTPUT; i <= CORE1_EQ_LAST_OUTPUT; i++) {
-                            if (matrix_mixer.outputs[i].enabled) { conflict = 1; break; }
-                        }
-                    } else if (is_core1_eq) {
-                        if (matrix_mixer.outputs[NUM_OUTPUT_CHANNELS - 1].enabled) conflict = 1;
-                    }
-                }
-                resp_buf[0] = conflict;
+                // No conflict: PDM sub and SPDIF 2+ can coexist.
+                // When PDM is active Core 1 runs the sigma-delta loop; Core 0 handles
+                // EQ for all SPDIF outputs in the single-core path.
+                resp_buf[0] = 0;
                 vendor_send_response(resp_buf, 1);
                 return true;
             }

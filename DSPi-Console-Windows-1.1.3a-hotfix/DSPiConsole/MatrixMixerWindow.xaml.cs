@@ -284,15 +284,12 @@ public sealed partial class MatrixMixerWindow : Window
             makeCell: o =>
             {
                 bool isEnabled = _viewModel.IsOutputEnabled(o);
-                bool conflict = !isEnabled && _viewModel.WouldConflict(o);
                 var btn = new Button
                 {
                     Content = new FontIcon { Glyph = "\uE7E8", FontSize = 15,
                         Foreground = new SolidColorBrush(isEnabled
                             ? Windows.UI.Color.FromArgb(255, 74, 143, 227)
-                            : conflict
-                                ? Windows.UI.Color.FromArgb(220, 230, 180, 50)
-                                : Windows.UI.Color.FromArgb(120, 200, 200, 220)) },
+                            : Windows.UI.Color.FromArgb(120, 200, 200, 220)) },
                     Background = new SolidColorBrush(isEnabled
                         ? Windows.UI.Color.FromArgb(40, 74, 143, 227)
                         : Colors.Transparent),
@@ -938,13 +935,10 @@ public sealed partial class MatrixMixerWindow : Window
         bool enabled = _viewModel.IsOutputEnabled(output);
         if (_outputEnableButtons.TryGetValue(output, out var btn))
         {
-            bool conflict = !enabled && _viewModel.WouldConflict(output);
             if (btn.Content is FontIcon icon)
                 icon.Foreground = new SolidColorBrush(enabled
                     ? Windows.UI.Color.FromArgb(255, 74, 143, 227)
-                    : conflict
-                        ? Windows.UI.Color.FromArgb(220, 230, 180, 50)
-                        : Windows.UI.Color.FromArgb(120, 200, 200, 220));
+                    : Windows.UI.Color.FromArgb(120, 200, 200, 220));
             btn.Background = enabled
                 ? new SolidColorBrush(Windows.UI.Color.FromArgb(40, 74, 143, 227))
                 : new SolidColorBrush(Colors.Transparent);
@@ -960,68 +954,27 @@ public sealed partial class MatrixMixerWindow : Window
             }
         }
 
-        // Refresh conflict styling on all enable buttons
-        RefreshConflictStyling();
+        RefreshOutputButtonStyling();
     }
 
-    private async void OnEnableClick(object sender, RoutedEventArgs e)
+    private void OnEnableClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button btn || btn.Tag is not int o) return;
 
         bool currentlyEnabled = _viewModel.IsOutputEnabled(o);
         if (currentlyEnabled)
         {
-            // Disabling — always allowed, no conflict check
             _viewModel.SetOutputEnabled(o, false);
             _viewModel.SetOutputEnableUsb(o, false);
-            return;
         }
-
-        // Enabling — check for conflict
-        if (_viewModel.WouldConflict(o))
-        {
-            var dialog = new ContentDialog
-            {
-                Title = "Output Conflict",
-                Content = GetConflictMessage(o),
-                PrimaryButtonText = "Proceed",
-                CloseButtonText = "Cancel",
-                DefaultButton = ContentDialogButton.Close,
-                XamlRoot = Content.XamlRoot
-            };
-
-            var result = await dialog.ShowAsync();
-            if (result != ContentDialogResult.Primary) return;
-
-            // Perform the switch
-            if (o == _viewModel.PdmOutputIndex)
-                await _viewModel.SwitchToPdmAsync();
-            else
-                await _viewModel.SwitchFromPdmAsync(o);
-            return;
-        }
-
-        // No conflict — enable directly
-        _viewModel.SetOutputEnabled(o, true);
-        _viewModel.SetOutputEnableUsb(o, true);
-    }
-
-    private string GetConflictMessage(int outputIndex)
-    {
-        bool isPdm = outputIndex == _viewModel.PdmOutputIndex;
-        bool isRp2040 = _viewModel.Platform == "RP2040";
-
-        if (isPdm)
-            return isRp2040
-                ? "Enabling PDM will disable SPDIF 2. Do you wish to proceed?"
-                : "Enabling PDM will disable SPDIF 2, 3 and 4. Do you wish to proceed?";
         else
-            return isRp2040
-                ? "Enabling SPDIF 2 will disable PDM. Do you wish to proceed?"
-                : "Enabling SPDIF 2, 3 or 4 will disable PDM. Do you wish to proceed?";
+        {
+            _viewModel.SetOutputEnabled(o, true);
+            _viewModel.SetOutputEnableUsb(o, true);
+        }
     }
 
-    private void RefreshConflictStyling()
+    private void RefreshOutputButtonStyling()
     {
         var outputs = _viewModel.ActiveOutputs;
         for (int o = 0; o < outputs.Count; o++)
@@ -1029,11 +982,8 @@ public sealed partial class MatrixMixerWindow : Window
             if (!_outputEnableButtons.TryGetValue(o, out var btn)) continue;
             if (btn.Content is not FontIcon icon) continue;
             bool enabled = _viewModel.IsOutputEnabled(o);
-            if (enabled) continue; // active outputs keep blue — already set
-            bool conflict = _viewModel.WouldConflict(o);
-            icon.Foreground = new SolidColorBrush(conflict
-                ? Windows.UI.Color.FromArgb(220, 230, 180, 50)
-                : Windows.UI.Color.FromArgb(120, 200, 200, 220));
+            if (enabled) continue;
+            icon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(120, 200, 200, 220));
         }
     }
 

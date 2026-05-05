@@ -1196,6 +1196,16 @@ static void apply_factory_defaults(void) {
         matrix_mixer.outputs[out].enabled = 0;
         matrix_mixer.outputs[out].gain_linear = 1.0f;
     }
+    // Default routes for PDM sub: L→sub and R→sub at 0 dB (output stays disabled until user enables it)
+    {
+        int sub_out = NUM_OUTPUT_CHANNELS - 1;
+        matrix_mixer.crosspoints[0][sub_out].enabled = 1;
+        matrix_mixer.crosspoints[0][sub_out].gain_db = 0.0f;
+        matrix_mixer.crosspoints[0][sub_out].gain_linear = 1.0f;
+        matrix_mixer.crosspoints[1][sub_out].enabled = 1;
+        matrix_mixer.crosspoints[1][sub_out].gain_db = 0.0f;
+        matrix_mixer.crosspoints[1][sub_out].gain_linear = 1.0f;
+    }
 
     // Reset pin configuration
     output_pins[0] = PICO_AUDIO_SPDIF_PIN;
